@@ -117,7 +117,7 @@ cd eventhub
 docker compose run --rm tests
 ```
 
-The first run builds the image, which is based on `mcr.microsoft.com/playwright` and comes with Chromium preinstalled. Later runs reuse it. The command exits non-zero when a test fails, so you can use it in scripts and CI.
+The first run builds the image: Node 22 plus Playwright with all browsers (Chromium, Firefox, WebKit) preinstalled. Later runs reuse it. GitHub Actions (`.github/workflows/playwright.yml`) builds the same image and runs the same command. The command exits non-zero when a test fails, so you can use it in scripts and CI.
 
 | Task | Command |
 |---|---|
@@ -129,7 +129,7 @@ The first run builds the image, which is based on `mcr.microsoft.com/playwright`
 
 - **Reports:** `playwright-report/` and `test-results/` are written to your machine. To view the report, open `playwright-report/index.html` in a browser.
 - **Editing tests:** `tests/` and `playwright.config.ts` are mounted into the container, so you can edit them and rerun without rebuilding.
-- **Upgrading Playwright:** the version in the `Dockerfile` image tag has to match `@playwright/test` in `package-lock.json`.
+- **Upgrading Playwright:** update `@playwright/test` in `package-lock.json`, then run `docker compose build`. The image installs browsers that match the locked version.
 - **PowerShell:** set the URL first with `$env:BASE_URL="http://host.docker.internal:3000"`, then run the command.
 
 ---
