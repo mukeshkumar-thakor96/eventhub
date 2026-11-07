@@ -29,7 +29,20 @@
       "Bash(ls -la /Users/rahulshetty/aithoughts/eventhub/frontend/.env* 2>&1)",
       "Bash(grep -r \"password\\\\|api.key\\\\|secret\\\\|token\" /Users/rahulshetty/aithoughts/eventhub/*.md 2>/dev/null | head -20)",
       "Bash(git remote:*)",
-      "Bash(git add:*)"
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(docker build:*)",
+      "Bash(docker run:*)",
+      "Bash(docker compose run:*)",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:docs.firefly-iii.org)",
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "Bash(gh api *)",
+      "Bash(docker --version)",
+      "Bash(docker compose *)",
+      "Bash(ls /Users/rahulshetty/aithoughts/)",
+      "Bash(mkdir -p /Users/rahulshetty/aithoughts/firefly-iii)",
+      "mcp__Claude_in_Chrome__tabs_context_mcp"
     ]
   }
 }
