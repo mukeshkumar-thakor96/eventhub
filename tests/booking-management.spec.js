@@ -5,6 +5,8 @@ import { test, expect } from '@playwright/test';
 const API_URL       = process.env.API_URL ?? 'https://api.eventhub.rahulshettyacademy.com/api';
 const USER_EMAIL    = 'rahulshetty1@gmail.com';
 const USER_PASSWORD = 'Magiclife1!';
+const OTHER_USER_EMAIL = 'rahulshetty1@yahoo.com';
+const OTHER_USER_PASSWORD = 'Magiclife1!';
 
 const CUSTOMER = {
   customerName:  'E2E Booking Tester',
@@ -61,10 +63,10 @@ async function apiCountBookings(request, token) {
 
 // ── UI helpers ─────────────────────────────────────────────────────────────────
 
-async function loginViaUi(page) {
+async function loginViaUi(page, email = USER_EMAIL, password = USER_PASSWORD) {
   await page.goto('/login');
-  await page.getByPlaceholder('you@email.com').fill(USER_EMAIL);
-  await page.getByLabel('Password').fill(USER_PASSWORD);
+  await page.getByPlaceholder('you@email.com').fill(email);
+  await page.getByLabel('Password').fill(password);
   await page.locator('#login-btn').click();
   // Home page loads after login — "Browse Events" link confirms successful auth
   await expect(page.getByRole('link', { name: /Browse Events/i }).first()).toBeVisible();
@@ -124,8 +126,8 @@ test.describe('Booking Management — E2E (test-strategy §2.4)', () => {
     await expect(bookingCardByRef(page, older.bookingRef)).toContainText(/🎫 1 ticket(?!s)/);
   });
 
-  // TC-003 (+ TC-102 price display, TC-010 back navigation) ───────────────────
-  test('TC-003: booking detail page shows all sections and navigates back to list', async ({ page, request }) => {
+  // TC-002 ───────────────────────────────────────────────────────────────────
+  test('TC-002: booking detail page shows all sections and navigates back to list', async ({ page, request }) => {
     // -- Step 1: Seed a 2-ticket booking via API --
     const event   = await apiFindStaticEvent(request, token, 2);
     const booking = await apiCreateBooking(request, token, event.id, 2);
@@ -176,7 +178,7 @@ test.describe('Booking Management — E2E (test-strategy §2.4)', () => {
   });
 
   // TC-004 ───────────────────────────────────────────────────────────────────
-  test('TC-004: "Clear all bookings" removes every booking after confirming', async ({ page, request }) => {
+  test('TC-003: "Clear all bookings" removes every booking after confirming', async ({ page, request }) => {
     // -- Step 1: Seed two bookings via API --
     const event = await apiFindStaticEvent(request, token, 2);
     await apiCreateBooking(request, token, event.id, 1);
@@ -204,125 +206,99 @@ test.describe('Booking Management — E2E (test-strategy §2.4)', () => {
     // -- Step 5: Backend confirms nothing is left --
     expect(await apiCountBookings(request, token)).toBe(0);
   });
-});
 
-// ── Legacy tests — pending rewrite per docs/test-strategy.md §2.4 / §5 ──────────
-// These still create data through the UI and use the old scenario numbering
-// (TC-006 → TC-009, TC-102 → fold into TC-009; TC-005 already renumbered).
+  test('TC-004: booking reference uses the event title prefix and supports lookup', async ({ request }) => {
+    // -- Step 1: Create a booking for an event with a known title --
+    const event = await apiFindStaticEvent(request, token, 1);
+    const booking = await apiCreateBooking(request, token, event.id, 1);
 
-const BASE_URL = 'https://eventhub.rahulshettyacademy.com';
-
-async function login(page) {
-  await page.goto(`${BASE_URL}/login`);
-  await page.getByPlaceholder('you@email.com').fill(USER_EMAIL);
-  await page.getByLabel('Password').fill(USER_PASSWORD);
-  await page.locator('#login-btn').click();
-  await expect(page.getByRole('link', { name: /Browse Events/i }).first()).toBeVisible();
-}
-
-async function bookEvent(page) {
-  await page.goto(`${BASE_URL}/events`);
-  const firstCard = page.getByTestId('event-card').filter({
-    has: page.getByTestId('book-now-btn'),
-  }).first();
-  await expect(firstCard).toBeVisible();
-  const eventTitle = (await firstCard.locator('h3').textContent())?.trim() ?? '';
-  await firstCard.getByTestId('book-now-btn').click();
-  await expect(page).toHaveURL(/\/events\/\d+/);
-  await page.getByLabel('Full Name').fill('Test User');
-  await page.locator('#customer-email').fill('testuser@example.com');
-  await page.getByPlaceholder('+91 98765 43210').fill('9876543210');
-  await page.locator('.confirm-booking-btn').click();
-  const refEl = page.locator('.booking-ref').first();
-  await expect(refEl).toBeVisible();
-  const bookingRef = (await refEl.textContent())?.trim() ?? '';
-  return { bookingRef, eventTitle };
-}
-
-async function clearBookings(page) {
-  await page.goto(`${BASE_URL}/bookings`);
-  const alreadyEmpty = await page.getByText('No bookings yet').isVisible().catch(() => false);
-  if (alreadyEmpty) return;
-  page.once('dialog', (dialog) => dialog.accept());
-  await page.getByRole('button', { name: /clear all bookings/i }).click();
-  await expect(page.getByText('No bookings yet')).toBeVisible();
-}
-
-test.describe('Booking Management — Legacy (pending rewrite)', () => {
-
-  test('TC-006: navigates to bookings list after booking via View My Bookings link', async ({ page }) => {
-    // -- Step 1: Login and clear state --
-    await login(page);
-    await clearBookings(page);
-
-    // -- Step 2: Book the first available event --
-    await page.goto(`${BASE_URL}/events`);
-    const firstCard = page.getByTestId('event-card').filter({
-      has: page.getByTestId('book-now-btn'),
-    }).first();
-    await expect(firstCard).toBeVisible();
-    await firstCard.getByTestId('book-now-btn').click();
-    await expect(page).toHaveURL(/\/events\/\d+/);
-
-    await page.getByLabel('Full Name').fill('Test User');
-    await page.locator('#customer-email').fill('testuser@example.com');
-    await page.getByPlaceholder('+91 98765 43210').fill('9876543210');
-    await page.locator('.confirm-booking-btn').click();
-
-    // -- Step 3: Confirm booking ref appears on confirmation card --
-    const refEl = page.locator('.booking-ref').first();
-    await expect(refEl).toBeVisible();
-    const bookingRef = (await refEl.textContent())?.trim() ?? '';
-
-    // -- Step 4: Click "View My Bookings" link on confirmation card --
-    await page.getByRole('link', { name: 'View My Bookings' }).click();
-    await expect(page).toHaveURL(`${BASE_URL}/bookings`);
-
-    // -- Step 5: Assert the new booking appears in the list --
-    const bookingCard = page.getByTestId('booking-card').filter({ hasText: bookingRef });
-    await expect(bookingCard).toBeVisible();
+    // -- Step 2: Verify the reference format and retrieve the booking by reference --
+    expect(booking.bookingRef).toMatch(
+      new RegExp(`^${event.title[0].toUpperCase()}-[A-Z0-9]{6}$`),
+    );
+    const response = await request.get(`${API_URL}/bookings/ref/${booking.bookingRef}`, {
+      headers: auth(token),
+    });
+    expect(response.ok()).toBeTruthy();
+    expect((await response.json()).data.id).toBe(booking.id);
   });
 
-  test('TC-102: booking reference starts with first letter of event title (uppercase)', async ({ page }) => {
-    // -- Step 1: Login and clear state --
-    await login(page);
-    await clearBookings(page);
+  test('TC-005: refund check reports eligibility for one ticket and not for a group', async ({ page, request }) => {
+    // -- Step 1: Seed single- and multi-ticket bookings --
+    const event = await apiFindStaticEvent(request, token, 3);
+    const single = await apiCreateBooking(request, token, event.id, 1);
+    const group = await apiCreateBooking(request, token, event.id, 2);
 
-    // -- Step 2: Book first available event and capture title --
-    const { bookingRef, eventTitle } = await bookEvent(page);
+    // -- Step 2: Log in and check the single-ticket booking --
+    await loginViaUi(page);
+    await page.goto(`/bookings/${single.id}`);
+    await page.getByTestId('check-refund-btn').click();
+    await expect(page.getByTestId('refund-spinner')).toBeVisible();
+    await expect(page.getByTestId('refund-result')).toContainText(
+      'Eligible for refund. Single-ticket bookings qualify for a full refund.',
+      { timeout: 6000 },
+    );
+    await expect(page.getByTestId('check-refund-btn')).toHaveCount(0);
 
-    // -- Step 3: Assert ref starts with the event title's first char --
-    const expectedPrefix = eventTitle[0].toUpperCase();
-    expect(bookingRef).toMatch(new RegExp(`^${expectedPrefix}-[A-Z0-9]{6}$`));
+    // -- Step 3: Check the multi-ticket booking --
+    await page.goto(`/bookings/${group.id}`);
+    await page.getByTestId('check-refund-btn').click();
+    await expect(page.getByTestId('refund-spinner')).toBeVisible();
+    await expect(page.getByTestId('refund-result')).toContainText(
+      'Not eligible for refund. Group bookings (2 tickets) are non-refundable.',
+      { timeout: 6000 },
+    );
   });
 
-  test('TC-005: cancels booking from detail page — shows toast and redirects', async ({ page }) => {
-    // -- Step 1: Login, clear state, create one booking --
-    await login(page);
-    await clearBookings(page);
-    const { bookingRef } = await bookEvent(page);
+  test('TC-006: canceling a booking from its card removes it and shows confirmation', async ({ page, request }) => {
+    // -- Step 1: Seed a booking and open the bookings list --
+    const event = await apiFindStaticEvent(request, token, 1);
+    const booking = await apiCreateBooking(request, token, event.id, 1);
+    await loginViaUi(page);
+    await page.goto('/bookings');
 
-    // -- Step 2: Navigate to booking detail via View Details --
-    await page.goto(`${BASE_URL}/bookings`);
-    const card = page.getByTestId('booking-card').filter({ hasText: bookingRef });
-    await card.getByRole('link', { name: 'View Details' }).click();
-    await expect(page).toHaveURL(/\/bookings\/\d+/);
-
-    // -- Step 3: Click Cancel Booking button on detail page --
-    await page.getByRole('button', { name: 'Cancel Booking' }).click();
-
-    // -- Step 4: Assert React confirmation dialog appears --
+    // -- Step 2: Open and confirm the cancellation dialog --
+    const card = bookingCardByRef(page, booking.bookingRef);
+    await card.getByTestId('cancel-booking-btn').click();
     await expect(page.getByText('Cancel this booking?')).toBeVisible();
-    await expect(page.locator('#confirm-dialog-yes')).toBeVisible();
+    await page.getByRole('button', { name: 'Yes, cancel it' }).click();
 
-    // -- Step 5: Confirm cancellation --
-    await page.locator('#confirm-dialog-yes').click();
-
-    // -- Step 6: Assert redirect to /bookings and success toast --
-    await expect(page).toHaveURL(`${BASE_URL}/bookings`);
+    // -- Step 3: Verify the booking is removed and success is reported --
     await expect(page.getByText('Booking cancelled successfully')).toBeVisible();
+    await expect(card).toHaveCount(0);
+    expect(await apiCountBookings(request, token)).toBe(0);
+  });
 
-    // -- Step 7: Assert booking is no longer in the list --
-    await expect(page.getByText('No bookings yet')).toBeVisible();
+  test('TC-007: canceling a booking from its detail page redirects to the list', async ({ page, request }) => {
+    // -- Step 1: Seed a booking and open its detail page --
+    const event = await apiFindStaticEvent(request, token, 1);
+    const booking = await apiCreateBooking(request, token, event.id, 1);
+    await loginViaUi(page);
+    await page.goto(`/bookings/${booking.id}`);
+
+    // -- Step 2: Confirm cancellation --
+    await page.getByRole('button', { name: 'Cancel Booking' }).click();
+    await expect(page.getByText('Cancel this booking?')).toBeVisible();
+    await page.getByRole('button', { name: 'Yes, cancel it' }).click();
+
+    // -- Step 3: Verify success feedback and navigation --
+    await expect(page).toHaveURL(/\/bookings$/);
+    await expect(page.getByText('Booking cancelled successfully')).toBeVisible();
+    expect(await apiCountBookings(request, token)).toBe(0);
+  });
+
+  test('TC-008: another user sees Access Denied for a booking they do not own', async ({ page, request }) => {
+    // -- Step 1: Create a booking for the primary test user --
+    const event = await apiFindStaticEvent(request, token, 1);
+    const booking = await apiCreateBooking(request, token, event.id, 1);
+
+    // -- Step 2: Log in as a different user and open the booking directly --
+    await loginViaUi(page, OTHER_USER_EMAIL, OTHER_USER_PASSWORD);
+    await page.goto(`/bookings/${booking.id}`);
+
+    // -- Step 3: Verify the access-denied state, not a not-found state --
+    await expect(page.getByText('Access Denied')).toBeVisible();
+    await expect(page.getByText('You are not authorized to view this booking.')).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Booking not found' })).toHaveCount(0);
   });
 });

@@ -1,11 +1,6 @@
-node_modules
-frontend/
-backend/
-docs/
-.next/
-playwright-report/
-test-results/
-.claude/
-*.log
-.DS_Store
-README.md
+# Allow-list: the test image only needs these files
+*
+!package.json
+!package-lock.json
+!playwright.config.ts
+!tests/

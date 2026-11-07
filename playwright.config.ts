@@ -9,7 +9,7 @@ export default defineConfig({
   reporter: 'html',
 
   use: {
-    baseURL: 'https://eventhub.rahulshettyacademy.com',
+    baseURL: process.env.BASE_URL || 'https://eventhub.rahulshettyacademy.com',
     headless: true,
     screenshot: 'only-on-failure',
     video: 'retain-on-failure',

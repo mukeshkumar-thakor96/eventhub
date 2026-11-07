@@ -2,16 +2,23 @@
 # Playwright E2E Tests
 #
 # PURPOSE:
-#   Runs the full Playwright test suite against the deployed production
-#   environment on every push to main. Uploads the HTML report as an artifact
-#   so results can be reviewed directly in the GitHub Actions UI.
+#   Runs the full Playwright test suite on every push to main and uploads the
+#   HTML report as an artifact so results can be reviewed from the Actions UI.
 #
-# TRIGGER: push to main
+# TRIGGER: push to main (plus manual runs via workflow_dispatch)
+#
+# HOW:
+#   Tests run inside the project's Docker image (Dockerfile: Node 22 + Playwright
+#   with all browsers pre-installed), so nothing is installed on the runner.
+#   The same image and command are used locally: `docker compose run --rm tests`.
 #
 # NOTES:
-#   - Tests run against https://eventhub.rahulshettyacademy.com (live site)
-#   - Chromium only (as configured in playwright.config.ts)
-#   - HTML report is retained for 30 days as a downloadable artifact
+#   - Tests run against the baseURL in playwright.config.ts (live site by
+#     default; override with the BASE_URL repository variable if needed)
+#   - Image layers are cached in the GitHub Actions cache, so the browser
+#     install only reruns when package.json / package-lock.json / Dockerfile change
+#   - The HTML report is uploaded even when tests fail, and kept for 30 days
+#   - The job is marked failed when any test fails
 # ══════════════════════════════════════════════════════════════════════════════
 
 name: Playwright E2E Tests
@@ -23,60 +30,49 @@ on:
   # Allow manual runs from the GitHub Actions UI
   workflow_dispatch:
 
+# Tests share one account with FIFO booking/event limits, so never run two
+# suites at the same time; queue new runs instead of cancelling mid-suite.
 concurrency:
   group: playwright-${{ github.ref }}
-  cancel-in-progress: true
-
-env:
-  NODE_VERSION: '21.7.1'
+  cancel-in-progress: false
 
 jobs:
-
-  # ╔═══════════════════════════════════════════════════════════════════════════
-  # ║  Playwright Tests
-  # ║  Installs dependencies, runs all specs, and uploads the HTML report.
-  # ╚═══════════════════════════════════════════════════════════════════════════
   playwright:
-    name: Run Playwright Tests
-    runs-on: ubuntu-latest
+    name: Run Playwright Tests (Docker)
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
 
     steps:
-      # ── Checkout ─────────────────────────────────────────────────────────────
+      # ── Checkout ──────────────────────────────────────────────────────────
       - name: Checkout code
         uses: actions/checkout@v4
 
-      # ── Node.js setup ─────────────────────────────────────────────────────────
-      - name: Setup Node.js ${{ env.NODE_VERSION }}
-        uses: actions/setup-node@v4
+      # ── Build the test image (with layer cache) ───────────────────────────
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      # Tagged with the image name docker-compose.yml expects, so compose
+      # reuses it instead of building again.
+      - name: Build Playwright Docker image
+        uses: docker/build-push-action@v6
         with:
-          node-version: ${{ env.NODE_VERSION }}
-          cache: 'npm'
-          cache-dependency-path: package-lock.json
+          context: .
+          load: true
+          tags: eventhub-playwright:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
 
-      # ── Install root dependencies ────────────────────────────────────────────
-      - name: Install dependencies
-        run: npm ci
-
-      # ── Install Playwright browsers ──────────────────────────────────────────
-      # Only installs Chromium (--with-deps installs OS-level dependencies too)
-      - name: Install Playwright browsers
-        run: npx playwright install chromium --with-deps
-
-      # ── Run all Playwright tests ─────────────────────────────────────────────
-      # Tests run against the live site defined in playwright.config.ts.
-      # --reporter=html,line gives a browsable HTML report + inline line output.
-      # `|| true` ensures the artifact upload step always runs even if tests fail.
+      # ── Run all Playwright tests inside the container ─────────────────────
+      # Report and test-results are bind-mounted back to the workspace.
       - name: Run Playwright tests
-        run: npx playwright test --reporter=html,line
-        continue-on-error: true
+        run: docker compose run --rm tests
+        env:
+          BASE_URL: ${{ vars.BASE_URL }}
 
-      # ── Upload HTML report as artifact ───────────────────────────────────────
-      # The report is generated in playwright-report/ by the html reporter.
-      # Retained for 30 days so the team can review results after a run.
+      # ── Upload HTML report (always, so failures can be inspected) ─────────
       - name: Upload Playwright HTML report
+        if: ${{ !cancelled() }}
         uses: actions/upload-artifact@v4
-        if: always()
         with:
           name: playwright-report-${{ github.run_id }}
           path: playwright-report/

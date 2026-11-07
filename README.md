@@ -107,6 +107,33 @@ npm run dev
 
 ---
 
+## Running the Playwright Tests with Docker
+
+The only thing you need installed is [Docker](https://docs.docker.com/get-docker/) (Docker Desktop on Windows/macOS). You don't need Node, npm, or any browsers.
+
+```bash
+git clone <repository-url>
+cd eventhub
+docker compose run --rm tests
+```
+
+The first run builds the image: Node 22 plus Playwright with all browsers (Chromium, Firefox, WebKit) preinstalled. Later runs reuse it. GitHub Actions (`.github/workflows/playwright.yml`) builds the same image and runs the same command. The command exits non-zero when a test fails, so you can use it in scripts and CI.
+
+| Task | Command |
+|---|---|
+| Run the whole suite | `docker compose run --rm tests` |
+| Run a single file | `docker compose run --rm tests tests/booking-management.spec.js` |
+| Run tests by title | `docker compose run --rm tests -g "test title"` |
+| Run against a local frontend | `BASE_URL=http://host.docker.internal:3000 docker compose run --rm tests` |
+| Rebuild after changing `package.json` / Playwright version | `docker compose build` |
+
+- **Reports:** `playwright-report/` and `test-results/` are written to your machine. To view the report, open `playwright-report/index.html` in a browser.
+- **Editing tests:** `tests/` and `playwright.config.ts` are mounted into the container, so you can edit them and rerun without rebuilding.
+- **Upgrading Playwright:** update `@playwright/test` in `package-lock.json`, then run `docker compose build`. The image installs browsers that match the locked version.
+- **PowerShell:** set the URL first with `$env:BASE_URL="http://host.docker.internal:3000"`, then run the command.
+
+---
+
 ## API Endpoints
 
 Base URL: `http://localhost:3001`
