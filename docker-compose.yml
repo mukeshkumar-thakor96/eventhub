@@ -1,0 +1,7 @@
+services:
+  tests:
+    build: .
+    # Mount report dirs so artifacts are accessible on the host after the run
+    volumes:
+      - ./playwright-report:/app/playwright-report
+      - ./test-results:/app/test-results

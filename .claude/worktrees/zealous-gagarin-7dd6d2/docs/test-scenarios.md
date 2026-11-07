@@ -1,7 +1,7 @@
 # EventHub — Booking Management Test Scenarios
 
-Generated: 2026-03-06
-Scope: Booking Management (Flow 4 — View, Cancel, Clear, Refund Eligibility)
+Generated: 2026-11-07
+Scope: Booking Management (book, view, cancel, clear, refund eligibility, FIFO limits, and cross-user security)
 
 ---
 
