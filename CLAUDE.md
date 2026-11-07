@@ -25,7 +25,7 @@ npm run test                                               # All Playwright test
 npm run test:ui                                            # Playwright UI mode
 npx playwright test tests/<file>.spec.js --reporter=line   # Single file
 npx playwright test -g "<test title>" --reporter=line      # Single test by title
-docker compose up --build                                  # Run tests in the Playwright container
+docker compose run --rm tests [playwright args]            # Run tests in the Playwright container (no local Node needed)
 ```
 
 Checks that CI (`.github/workflows/ci.yml`) runs on PRs — run these locally before pushing:

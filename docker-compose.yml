@@ -1,7 +1,24 @@
+# Run the Playwright suite with no local Node/browsers:
+#   docker compose run --rm tests                                   # whole suite
+#   docker compose run --rm tests tests/booking-management.spec.js  # one file
+#   docker compose run --rm tests -g "test title"                   # one test
+# Reports land in ./playwright-report and ./test-results on the host.
 services:
   tests:
     build: .
-    # Mount report dirs so artifacts are accessible on the host after the run
+    image: eventhub-playwright
+    # Recommended by Playwright: avoids Chromium crashes from the small default /dev/shm
+    ipc: host
+    init: true
+    environment:
+      # Optional override, e.g. BASE_URL=http://host.docker.internal:3000 to hit a local frontend
+      - BASE_URL
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     volumes:
+      # Live-mount tests/config so edits don't need an image rebuild
+      - ./tests:/app/tests:ro
+      - ./playwright.config.ts:/app/playwright.config.ts:ro
+      # Artifacts written back to the host
       - ./playwright-report:/app/playwright-report
       - ./test-results:/app/test-results
